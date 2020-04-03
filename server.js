@@ -5,6 +5,7 @@ var authJwtController = require('./auth_jwt');
 var User = require('./Users');
 var jwt = require('jsonwebtoken');
 var cors = require('cors');
+var Movie = require('./Movies');
 
 
 var app = express();
@@ -97,6 +98,51 @@ router.post('/signin', function(req, res) {
 
     });
 });
+
+router.route('/movies')
+    .post(authJwtController.isAuthenticated, function (req, res) {
+            console.log(req.body);
+
+            if(!req.body.title || !req.body.releaseYear || !req.body.genre){
+                console.log("Error. Title, releaseYear or genre not found!");
+                return res.json({ success: false, message: "Error. Title, releaseYear or genre not found!"});
+
+            }
+
+            //var howManyActors = JSON.parse(req);
+
+            if(!req.body.actors[2]){
+                console.log("Error. Each movie requires 3 actors!");
+                return res.json({ success: false, message: "Error. Each movie requires 3 actors!"});
+            }
+
+            var movie = new Movie();
+            movie.title = req.body.title;
+            movie.genre = req.body.genre;
+            movie.releaseYear = req.body.releaseYear;
+            movie.actors = req.body.actors;
+
+            movie.save(function(err){
+                console.log("Error! weeoo weeoo");
+                return res.send(err);
+            });
+
+            return res.json({ success: true, message: "New movie created!!"});
+        })
+
+    .get(authJwtController.isAuthenticated, function (req, res){
+        Movie.find(function(err, movies){
+            if(err){
+                console.log("There was an error getting movie :(");
+                return res.send(err);
+            }
+            
+            if(!err){
+                console.log("You got a movieeeeee");
+                return res.json(movies);
+            }
+            });
+        })
 
 app.use('/', router);
 app.listen(process.env.PORT || 8080);
