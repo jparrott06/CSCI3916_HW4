@@ -77,28 +77,34 @@ router.post('/signup', function(req, res) {
 });
 
 router.post('/signin', function(req, res) {
-    var userNew = new User();
-    //userNew.name = req.body.name;
-    userNew.username = req.body.username;
-    userNew.password = req.body.password;
+    if (!req.body.username || !req.body.password || req.body.password === "" || req.body.username === "") {
+        res.json({success: false, message: 'Please pass username and password.'});
+    }
 
-    User.findOne({ username: userNew.username }).select('name username password').exec(function(err, user) {
-        if (err) res.send(err);
+    else {
 
-        user.comparePassword(userNew.password, function(isMatch){
-            if (isMatch) {
-                var userToken = {id: user._id, username: user.username};
-                var token = jwt.sign(userToken, process.env.SECRET_KEY);
-                console.log(req.body);
-                res.json({success: true, token: 'JWT ' + token});
-            }
-            else {
-                res.status(401).send({success: false, message: 'Authentication failed.'});
-            }
+        var userNew = new User();
+        //userNew.name = req.body.name;
+        userNew.username = req.body.username;
+        userNew.password = req.body.password;
+
+        User.findOne({username: userNew.username}).select('name username password').exec(function (err, user) {
+            if (err) res.send(err);
+
+            user.comparePassword(userNew.password, function (isMatch) {
+                if (isMatch) {
+                    var userToken = {id: user._id, username: user.username};
+                    var token = jwt.sign(userToken, process.env.SECRET_KEY);
+                    console.log(req.body);
+                    res.json({success: true, token: 'JWT ' + token});
+                } else {
+                    res.status(401).send({success: false, message: 'Authentication failed.'});
+                }
+            });
+
+
         });
-
-
-    });
+    }
 });
 //routing for Movies//
 router.route('/movies')
@@ -212,7 +218,19 @@ router.route('/movies')
                                 from: 'reviews',
                                 localField: '_id',
                                 foreignField: 'movieid',
-                                as: 'Reviews'
+                                as: 'reviews'
+                            }
+
+                        },
+                        {
+                            $addFields:{
+                                ratingAvg: {$avg: "$reviews.rating"}
+                            }
+                        },
+
+                        {
+                            $sort: {
+                                ratingAvg: -1
                             }
                         }
                     ],function(err, data) {
@@ -304,19 +322,32 @@ router.route('/movies/:movieid')
                     },
 
                     {
-                        $lookup:{
+                        $lookup: {
                             from: 'reviews',
                             localField: '_id',
                             foreignField: 'movieid',
-                            as: 'Reviews'
+                            as: 'reviews'
+                        }
+                    },
+
+                    {
+                        $addFields:{
+                            ratingAvg: {$avg: "$reviews.rating"}
+                        }
+                    },
+
+                    {
+                        $sort: {
+                            ratingAvg: -1
                         }
                     }
+
                 ],function(err, data) {
 
                     if(err){
                         res.send(err);
                     }else{
-                        res.json(data);
+                        res.json(data[0]);
                     }
                 });
             } else {
@@ -332,7 +363,7 @@ router.route('/movies/:movieid')
 router.route('/reviews')
     .post(authJwtController.isAuthenticated, function (req, res) {
             console.log(req.body);
-            if(!req.body.reviewer || !req.body.description || !req.body.rating || !req.body.movieid){
+            if(!req.body.description || !req.body.rating || !req.body.movieid){
                 console.log("Reviewer name, Review, Rating or MovieID not found!");
                 res.json({success: false, message: "Error. Reviewer name, Review, Rating or MovieID not found!"});
             }
